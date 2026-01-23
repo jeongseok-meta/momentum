@@ -66,6 +66,7 @@ cd momentum
 pixi run build      # Builds C++ library and Python bindings
 pixi run test       # Runs tests
 pixi run hello_world  # Runs example
+pixi run import_test  # Tests pymomentum imports with dynamic module discovery
 ```
 
 **For detailed instructions**, see the comprehensive guides on our website:

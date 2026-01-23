@@ -66,6 +66,11 @@ jobs:
         MOMENTUM_BUILD_WITH_FBXSDK=ON \
           pixi run doc_py
 
+    # 3.5) Test pymomentum imports with dynamic module discovery
+    - name: Test pymomentum Imports
+      run: |
+        pixi run import_test
+
     # 4) Copy Python API Documentation to Docusaurus
     - name: Copy Python API Documentation
       run: |

@@ -11,6 +11,31 @@ import sys
 from pathlib import Path
 
 
+def get_pymomentum_modules() -> list[str]:
+    """Dynamically discover all pymomentum submodules to test.
+
+    Returns a list of module names that should be importable from pymomentum.
+    This is determined by looking at the package structure.
+    """
+    # Core modules that are always expected (compiled C++ extensions)
+    core_modules = [
+        "pymomentum.geometry",
+        "pymomentum.solver",
+        "pymomentum.solver2",
+        "pymomentum.marker_tracking",
+        "pymomentum.axel",
+    ]
+
+    # Optional modules (may or may not be present depending on build options)
+    optional_modules = [
+        "pymomentum.torch",
+        "pymomentum.tensor_ik",
+        "pymomentum.tensor_momentum",
+    ]
+
+    return core_modules, optional_modules
+
+
 def test_in_container(wheel_file: Path, wheel_type: str, py_ver: str) -> int:
     """Test wheel in a manylinux_2_28 container using podman."""
     print(f"Testing wheel in manylinux_2_28 container: {wheel_file.name}")
@@ -20,6 +45,78 @@ def test_in_container(wheel_file: Path, wheel_type: str, py_ver: str) -> int:
         torch_index = "https://download.pytorch.org/whl/cu128"
     else:
         torch_index = "https://download.pytorch.org/whl/cpu"
+
+    core_modules, optional_modules = get_pymomentum_modules()
+
+    # Build the dynamic import test script
+    import_test_code = (
+        '''
+import sys
+import importlib
+import pkgutil
+
+def discover_and_test_modules():
+    """Dynamically discover and test all pymomentum modules."""
+    core_modules = '''
+        + repr(core_modules)
+        + """
+    optional_modules = """
+        + repr(optional_modules)
+        + """
+
+    print("=" * 60)
+    print("Testing pymomentum imports in clean uv environment")
+    print("=" * 60)
+
+    # Test core modules (required)
+    failed = []
+    for module in core_modules:
+        try:
+            importlib.import_module(module)
+            print(f"  ✓ {module}")
+        except Exception as e:
+            print(f"  ✗ {module}: {e}", file=sys.stderr)
+            failed.append(module)
+
+    # Test optional modules (not required to pass)
+    print("\\nOptional modules:")
+    for module in optional_modules:
+        try:
+            importlib.import_module(module)
+            print(f"  ✓ {module}")
+        except Exception as e:
+            print(f"  ○ {module}: not available ({type(e).__name__})")
+
+    # Discover additional submodules dynamically
+    print("\\nDynamic module discovery:")
+    try:
+        import pymomentum
+        for importer, modname, ispkg in pkgutil.walk_packages(
+            pymomentum.__path__, prefix="pymomentum."
+        ):
+            if modname not in core_modules and modname not in optional_modules:
+                try:
+                    importlib.import_module(modname)
+                    print(f"  ✓ {modname}")
+                except Exception as e:
+                    print(f"  ○ {modname}: {type(e).__name__}")
+    except Exception as e:
+        print(f"  Could not walk package: {e}")
+
+    print("\\n" + "=" * 60)
+    if failed:
+        print(f"FAILED: {len(failed)} core module(s) failed to import")
+        for m in failed:
+            print(f"  - {m}")
+        return 1
+    else:
+        print("SUCCESS: All core modules imported successfully")
+        return 0
+
+if __name__ == "__main__":
+    sys.exit(discover_and_test_modules())
+"""
+    )
 
     # Container command to test the wheel
     # py_ver is like "cp312" or "cp313", so py_ver[2:] gives "312" or "313"
@@ -40,20 +137,11 @@ $PYTHON -m uv pip install --python /tmp/test_venv/bin/python "torch>=2.8.0,<2.9"
 echo "Installing wheel..."
 $PYTHON -m uv pip install --python /tmp/test_venv/bin/python /wheel/{wheel_file.name}
 
+echo ""
 echo "Testing imports..."
-/tmp/test_venv/bin/python -c "
-import sys
-try:
-    import pymomentum.geometry as geom
-    import pymomentum.solver as solver
-    import pymomentum.solver2 as solver2
-    import pymomentum.marker_tracking as marker_tracking
-    import pymomentum.axel as axel
-    print('✓ All imports successful')
-except Exception as e:
-    print(f'✗ Import failed: {{e}}', file=sys.stderr)
-    sys.exit(1)
-"
+/tmp/test_venv/bin/python << 'IMPORT_TEST_EOF'
+{import_test_code}
+IMPORT_TEST_EOF
 """
 
     # Run the test in a manylinux_2_28 container

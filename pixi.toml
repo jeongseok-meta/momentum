@@ -31,6 +31,7 @@ tracy-profiler-gui = ">=0.11.1,<0.13"
 twine = ">=6.1.0,<7"
 jinja2 = ">=3.1.0,<4"
 cibuildwheel = ">=2.22.0,<3"
+uv = ">=0.7.0,<1"
 
 # runtime dependencies
 blas = ">=2.135,<3"
@@ -199,6 +200,11 @@ wheel_check = { cmd = "twine check dist/pymomentum_*.whl", depends-on = [
 wheel_test = { cmd = "python scripts/test_wheel.py", depends-on = [
     "wheel_build",
 ], description = "Test wheel imports in a clean virtual environment using uv" }
+
+# Test pymomentum imports with dynamic module discovery
+import_test = { cmd = "python scripts/test_import.py", depends-on = [
+    "build_py",
+], description = "Test pymomentum imports with dynamic module discovery" }
 
 # Publish to TestPyPI for testing
 wheel_publish_testpypi = { cmd = "twine upload --repository testpypi --skip-existing dist/pymomentum_*.whl", depends-on = [

@@ -150,6 +150,10 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         run: pixi run -e ${{ matrix.pixi-environment }} wheel_build
 
+      - name: Test CPU wheel imports
+        if: steps.should_run.outputs.run == 'true'
+        run: pixi run -e ${{ matrix.pixi-environment }} wheel_test
+
       - name: Print ccache stats
         if: steps.should_run.outputs.run == 'true'
         run: ccache -s
